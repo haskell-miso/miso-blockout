@@ -4,6 +4,8 @@
 A [Blockout](https://en.wikipedia.org/wiki/Blockout) (3D Tetris) clone written in Haskell
 using [miso](https://github.com/dmjio/miso), compiled to WebAssembly.
 
+See [live](https://blockout.haskell-miso.org)
+
 ### Prerequisites
 
 [Nix](https://nixos.org) with [flakes](https://wiki.nixos.org/wiki/Flakes) enabled.
