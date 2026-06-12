@@ -1,4 +1,4 @@
-🧊 miso-blockout
+🍜 🧊 miso-blockout
 ================
 
 A [Blockout](https://en.wikipedia.org/wiki/Blockout) (3D Tetris) clone written in Haskell
