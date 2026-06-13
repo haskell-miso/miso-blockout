@@ -2,7 +2,9 @@ cabal-version:   3.0
 name:            miso-blockout
 version:         0.1.0.0
 synopsis:        A Blockout clone built with miso
-description:     Blockout (3D Tetris) clone running in the browser via GHC WASM
+description:
+  Blockout (3D Tetris) clone running in the browser via GHC WASM
+
 license:         BSD-3-Clause
 license-file:    LICENSE
 author:          Jan Hrček

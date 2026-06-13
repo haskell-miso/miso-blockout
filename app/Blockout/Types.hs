@@ -86,6 +86,33 @@ setWeight = \case
     Extended -> 3
 
 -----------------------------------------------------------------------------
+-- Setup parameter ranges and small shared helpers
+-----------------------------------------------------------------------------
+
+{- | Inclusive ranges of the configurable pit dimensions. Shared by the
+setup menu (which cycles within them) and "Blockout.Persist" (which
+validates loaded values against them), so the two cannot drift apart.
+-}
+widthRange, lengthRange, depthRange :: (Int, Int)
+widthRange = (3, 7)
+lengthRange = (3, 7)
+depthRange = (6, 18)
+
+-- | Is a value within an inclusive range?
+inRange :: (Int, Int) -> Int -> Bool
+inRange (lo, hi) v = lo <= v && v <= hi
+
+-- | Wrap a value into an inclusive range, cycling round at either end.
+wrapRange :: (Int, Int) -> Int -> Int
+wrapRange (lo, hi) v = lo + (v - lo) `mod` (hi - lo + 1)
+
+-- | Step a bounded enum one position in the given direction, wrapping round.
+cycleEnum :: (Bounded a, Enum a, Eq a) => Int -> a -> a
+cycleEnum dir x
+    | dir >= 0 = if x == maxBound then minBound else succ x
+    | otherwise = if x == minBound then maxBound else pred x
+
+-----------------------------------------------------------------------------
 -- Scenes (menu system)
 -----------------------------------------------------------------------------
 
@@ -123,18 +150,12 @@ adjustRow row dir s = case row of
          in case [i | (i, p) <- zip [0 ..] (NE.toList ps), p == s] of
                 (i : _) -> ps NE.!! ((i + dir) `mod` length ps)
                 [] -> if dir >= 0 then NE.head ps else NE.last ps
-    1 -> s{setupSet = cyc (setupSet s)}
-    2 -> s{setupSpeed = cyc (setupSpeed s)}
-    3 -> s{setupW = wrap 3 7 (setupW s + dir)}
-    4 -> s{setupL = wrap 3 7 (setupL s + dir)}
-    5 -> s{setupD = wrap 6 18 (setupD s + dir)}
+    1 -> s{setupSet = cycleEnum dir (setupSet s)}
+    2 -> s{setupSpeed = cycleEnum dir (setupSpeed s)}
+    3 -> s{setupW = wrapRange widthRange (setupW s + dir)}
+    4 -> s{setupL = wrapRange lengthRange (setupL s + dir)}
+    5 -> s{setupD = wrapRange depthRange (setupD s + dir)}
     _ -> s
-  where
-    cyc :: (Bounded a, Enum a, Eq a) => a -> a
-    cyc x
-        | dir >= 0 = if x == maxBound then minBound else succ x
-        | otherwise = if x == minBound then maxBound else pred x
-    wrap lo hi v = lo + (v - lo) `mod` (hi - lo + 1)
 
 -----------------------------------------------------------------------------
 -- Model
@@ -253,19 +274,29 @@ ticks = lens _ticks (\r f -> r{_ticks = f})
 -- Derived game parameters
 -----------------------------------------------------------------------------
 
-{- | 11 difficulty levels, 0..10. Larger pits need more cubes per level
-(manual: "In larger pits, you must drop more cubes before the difficulty
-level changes").
+{- | 11 difficulty levels, 0..10. As in the original BlockOut, the level is
+driven by the cumulative volume of /cleared/ cubes, not by cubes dropped. A
+level-up triggers once the cubes cleared reach a threshold of @width * length
+* 2@ per level. Since each cleared layer contributes @width * length@ cubes,
+this reduces to one level bump for every 2 full layers cleared, regardless of
+pit size.
 -}
 level :: Model -> Int
-level m = min 10 (_startLevel m + _cubes m `div` cubesPerLevel (_setup m))
+level m =
+    min 10 (_startLevel m + (_cleared m * layerCubes) `div` cubesPerLevel (_setup m))
+  where
+    layerCubes = setupW (_setup m) * setupL (_setup m)
 
 cubesPerLevel :: Setup -> Int
-cubesPerLevel s = max 12 (pitVolume s `div` 12)
+cubesPerLevel s = setupW s * setupL s * 2
 
--- | Gravity period in 100ms ticks for a given level.
+{- | Gravity period in 100ms ticks for a given level. The original game's
+drop speed decays roughly geometrically with the level (the time to fall
+one layer multiplies by ~0.7 each level), so model it as such, floored at
+2 ticks (0.2s) so the fastest levels stay playable.
+-}
 dropTicks :: Int -> Int
-dropTicks lvl = max 2 (12 - lvl)
+dropTicks lvl = max 2 (round (50 * 0.7 ^^ lvl :: Double))
 
 -- | The slide window after a drop, in 100ms ticks (manual p.10 note).
 lockTicks :: Int

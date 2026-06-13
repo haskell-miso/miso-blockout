@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OrPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Rendering: the pit (SVG perspective projection) and the menu screens.
@@ -61,10 +62,14 @@ menuScreen heading contents =
         [P.class_ "menuScreen"]
         (H.div_ [P.class_ "menuScreen-title"] [text heading] : contents)
 
+-- | A base class with the "sel" modifier appended when the row is selected.
+selClass :: MisoString -> Bool -> MisoString
+selClass base sel = if sel then base <> " sel" else base
+
 selectable :: Bool -> Action -> MisoString -> View Model Action
 selectable isSel act label =
     H.div_
-        [ P.class_ (if isSel then "mrow sel" else "mrow")
+        [ P.class_ (selClass "mrow" isSel)
         , onClick act
         ]
         [text (if isSel then "\x25BA " <> label else label)]
@@ -87,11 +92,10 @@ levelView :: Int -> View Model Action
 levelView n =
     menuScreen
         "STARTING LEVEL"
-        [ H.div_ [P.class_ "note"] ["0 is the easiest level"]
-        , H.div_
+        [ H.div_
             [P.class_ "levels"]
             [ H.div_
-                [ P.class_ (if k == n then "lvl sel" else "lvl")
+                [ P.class_ (selClass "lvl" (k == n))
                 , onClick (PickLevel k)
                 ]
                 [text (ms k)]
@@ -105,7 +109,7 @@ setupView i draft =
   where
     valueRow r =
         H.div_
-            [ P.class_ (if i == r then "srow sel" else "srow")
+            [ P.class_ (selClass "srow" (i == r))
             , onClick (SetupClick r (adjustRow r 1 draft))
             ]
             [ H.span_ [P.class_ "slabel"] [text (rowLabel r)]
@@ -285,8 +289,12 @@ pitSvg m =
         , P.class_ "pit"
         ]
         ( pitGrid s
-            ++ wellCubes s (_well m)
-            ++ pieceWire s (_spin m) (_piece m)
+            -- When paused, hide the well and the falling piece so players
+            -- cannot study the position while the game is frozen.
+            ++ ( if _status m == Paused
+                    then []
+                    else wellCubes s (_well m) ++ pieceWire s (_spin m) (_piece m)
+               )
             ++ overlay (_status m)
         )
   where
@@ -309,7 +317,7 @@ leftPanel m =
         ]
   where
     segColor z
-        | any (\(_, _, cz) -> cz == z) (_well m) = faceColor z
+        | any (\(_, _, cz) -> cz == z) (_well m) = faceColor (setupD (_setup m)) z
         | otherwise = "#101010"
 
 rightPanel :: Model -> View Model Action
@@ -415,26 +423,30 @@ pitGrid s =
     depth = fi d
     ring z = [proj s 0 0 z, proj s (fi w) 0 z, proj s (fi w) (fi l) z, proj s 0 (fi l) z]
 
--- | (face, shaded side) color per pit layer, repeating every 12 layers.
+{- | (face, shaded side) color per pit layer, matching the original game's
+cycle. Colors are anchored to the bottom of the pit and run toward the
+viewer, repeating every 7 layers.
+-}
 palette :: [(MisoString, MisoString)]
 palette =
-    [ ("#ff3030", "#8c1a1a")
-    , ("#ff8020", "#8c4612")
-    , ("#ffd000", "#8c7200")
-    , ("#b0e000", "#5f7a00")
-    , ("#40d040", "#227222")
-    , ("#00c890", "#006e4f")
-    , ("#00b8d8", "#006576")
-    , ("#0090ff", "#004f8c")
-    , ("#4060ff", "#23348c")
-    , ("#8040ff", "#46238c")
-    , ("#c030e0", "#691a7a")
-    , ("#ff30a0", "#8c1a58")
+    [ ("#0000aa", "#000055")
+    , ("#00aa00", "#005500")
+    , ("#00aaaa", "#005555")
+    , ("#aa0000", "#550000")
+    , ("#aa00aa", "#550055")
+    , ("#aa5500", "#552a00")
+    , ("#aaaaaa", "#555555")
     ]
 
-faceColor, sideColor :: Int -> MisoString
-faceColor z = fst (palette !! (z `mod` length palette))
-sideColor z = snd (palette !! (z `mod` length palette))
+{- | Index into the cycle for layer @z@ in a pit of depth @d@, counting from
+the bottom-most layer (z = d - 1) toward the mouth (z = 0).
+-}
+paletteIx :: Int -> Int -> Int
+paletteIx d z = (d - 1 - z) `mod` length palette
+
+faceColor, sideColor :: Int -> Int -> MisoString
+faceColor d z = fst (palette !! paletteIx d z)
+sideColor d z = snd (palette !! paletteIx d z)
 
 {- | Locked cubes, painted back to front. Each cube shows its front face,
 plus any side faces that look toward the viewer and are not hidden by a
@@ -450,7 +462,7 @@ wellCubes s w = concat [layerViews z | z <- [setupD s - 1, setupD s - 2 .. 0]]
          in concatMap sideFaces cs ++ map frontFace cs
     frontFace (x, y, z) =
         poly
-            (faceColor z)
+            (faceColor (setupD s) z)
             "#000000"
             "1"
             [pr x y z, pr (x + 1) y z, pr (x + 1) (y + 1) z, pr x (y + 1) z]
@@ -473,7 +485,7 @@ wellCubes s w = concat [layerViews z | z <- [setupD s - 1, setupD s - 2 .. 0]]
               , free x (y + 1) z
               ]
             ]
-    quad z = poly (sideColor z) "#000000" "1"
+    quad z = poly (sideColor (setupD s) z) "#000000" "1"
     free x y z = (x, y, z) `notElem` w
     pr x y z = proj s (fi x) (fi y) (fi z)
 
@@ -535,8 +547,7 @@ outlineEdges cs =
     occ c = c `elem` cs
     -- a\/d and b\/c are the diagonal pairs of the four cells around an edge
     sharp a b c d = case length (filter id [a, b, c, d]) of
-        1 -> True
-        3 -> True
+        (1; 3) -> True
         2 -> (a && d) || (b && c)
         _ -> False
 
@@ -597,6 +608,13 @@ sheet =
             , "flex-direction" =: "column"
             , "gap" =: "10px"
             , "align-items" =: "stretch"
+            , -- Scale the whole UI up by the largest factor that still fits the
+              -- viewport. min() picks the binding dimension, so aspect ratio is
+              -- preserved; the body's flex-center keeps it centred and its
+              -- overflow:hidden suppresses scrollbars. 846x680 is the layout's
+              -- natural size (panels + pit, titlebar + footer).
+              "transform" =: "scale(min(100vw / 846px, 100vh / 680px))"
+            , "transform-origin" =: "center center"
             ]
         , CSS.selector_
             ".titlebar"
@@ -618,8 +636,7 @@ sheet =
             ]
         , CSS.selector_
             ".pit"
-            [ "border" =: "2px solid #2244cc"
-            , "background-color" =: "#000000"
+            [ "background-color" =: "#000000"
             ]
         , CSS.selector_
             ".panel"
@@ -731,25 +748,21 @@ sheet =
         , CSS.selector_
             ".levels"
             [ CSS.display "flex"
-            , "flex-direction" =: "row"
-            , "justify-content" =: "center"
+            , "flex-direction" =: "column"
+            , "align-items" =: "center"
             , "gap" =: "8px"
             , "margin-top" =: "16px"
             ]
         , CSS.selector_
             ".lvl"
-            [ "border" =: "2px solid #2244cc"
-            , "color" =: "#00cc00"
+            [ "color" =: "#006600"
             , CSS.fontSize "22px"
             , CSS.fontWeight "bold"
-            , CSS.padding (CSS.px 10)
             , "cursor" =: "pointer"
             ]
         , CSS.selector_
             ".lvl.sel"
-            [ "background-color" =: "#1a1a1a"
-            , "color" =: "#ffd000"
-            , "border-color" =: "#ffd000"
+            [ "color" =: "#ffd000"
             ]
         , CSS.selector_
             ".name-entry"
