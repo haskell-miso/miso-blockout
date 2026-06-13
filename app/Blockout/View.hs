@@ -231,9 +231,50 @@ gameLayout m =
     H.div_
         [P.class_ "layout"]
         [ leftPanel m
-        , pitSvg m
+        , H.div_ [P.class_ "pit-col"] [pitSvg m, mobileControls (_status m)]
         , rightPanel m
         ]
+
+mobileControls :: Status -> View Model Action
+mobileControls st =
+    H.div_
+        [P.class_ "mobile-controls"]
+        [ H.div_
+            [P.class_ "mc-top"]
+            [ H.div_
+                [P.class_ "mc-dpad"]
+                [ H.div_ [P.class_ "mc-row"] [spacer, mcBtn "\x2191" 38, spacer]
+                , H.div_ [P.class_ "mc-row"] [mcBtn "\x2190" 37, spacer, mcBtn "\x2192" 39]
+                , H.div_ [P.class_ "mc-row"] [spacer, mcBtn "\x2193" 40, spacer]
+                ]
+            , H.div_
+                [P.class_ "mc-rotate"]
+                [ H.div_
+                    [P.class_ "mc-row"]
+                    [ mcBtnL "X\x21BA" 81
+                    , mcBtnL "Y\x21BA" 87
+                    , mcBtnL "Z\x21BA" 69
+                    ]
+                , H.div_
+                    [P.class_ "mc-row"]
+                    [ mcBtnL "X\x21BB" 65
+                    , mcBtnL "Y\x21BB" 83
+                    , mcBtnL "Z\x21BB" 68
+                    ]
+                ]
+            ]
+        , H.div_
+            [P.class_ "mc-bottom"]
+            [ mcBtnL "DROP" 32
+            , mcBtnL (if st == Paused then "RESUME" else "PAUSE") 80
+            , mcBtnL "MENU" 27
+            ]
+        ]
+  where
+    fire code = onClick (KeyDown (code, False, ""))
+    mcBtn lbl code = H.button_ [P.class_ "mc-btn", fire code] [text lbl]
+    mcBtnL lbl code = H.button_ [P.class_ "mc-btn mc-lbl", fire code] [text lbl]
+    spacer = H.div_ [P.class_ "mc-spacer"] []
 
 pitSvg :: Model -> View Model Action
 pitSvg m =
@@ -748,5 +789,85 @@ sheet =
         , CSS.selector_
             ".fscore"
             [ "color" =: "#ffb000"
+            ]
+        , CSS.selector_
+            ".pit-col"
+            [ CSS.display "flex"
+            , "flex-direction" =: "column"
+            ]
+        , CSS.selector_
+            ".mobile-controls"
+            [ CSS.display "none"
+            ]
+        , CSS.selector_
+            ".mc-top"
+            [ CSS.display "flex"
+            , "flex-direction" =: "row"
+            , "justify-content" =: "space-around"
+            , "gap" =: "12px"
+            , CSS.alignItems "flex-start"
+            ]
+        , CSS.selector_
+            ".mc-dpad"
+            [ CSS.display "flex"
+            , "flex-direction" =: "column"
+            , "gap" =: "4px"
+            , CSS.alignItems "center"
+            ]
+        , CSS.selector_
+            ".mc-rotate"
+            [ CSS.display "flex"
+            , "flex-direction" =: "column"
+            , "gap" =: "4px"
+            , CSS.alignItems "center"
+            ]
+        , CSS.selector_
+            ".mc-row"
+            [ CSS.display "flex"
+            , "flex-direction" =: "row"
+            , "gap" =: "4px"
+            , "justify-content" =: "center"
+            ]
+        , CSS.selector_
+            ".mc-bottom"
+            [ CSS.display "flex"
+            , "flex-direction" =: "row"
+            , "gap" =: "12px"
+            , "justify-content" =: "center"
+            , "margin-top" =: "10px"
+            ]
+        , CSS.selector_
+            ".mc-btn"
+            [ "width" =: "62px"
+            , "height" =: "62px"
+            , "background-color" =: "#1a1a1a"
+            , "border" =: "2px solid #2244cc"
+            , "color" =: "#00cc00"
+            , CSS.fontFamily "'Courier New', monospace"
+            , CSS.fontSize "24px"
+            , CSS.fontWeight "bold"
+            , "cursor" =: "pointer"
+            , "touch-action" =: "manipulation"
+            , "-webkit-user-select" =: "none"
+            , "user-select" =: "none"
+            , CSS.display "flex"
+            , CSS.alignItems "center"
+            , CSS.justifyContent "center"
+            , "padding" =: "0"
+            , "box-sizing" =: "border-box"
+            ]
+        , CSS.selector_
+            ".mc-btn:active"
+            [ "background-color" =: "#2244cc"
+            , "color" =: "#ffffff"
+            ]
+        , CSS.selector_
+            ".mc-lbl"
+            [ CSS.fontSize "13px"
+            ]
+        , CSS.selector_
+            ".mc-spacer"
+            [ "width" =: "62px"
+            , "height" =: "62px"
             ]
         ]
