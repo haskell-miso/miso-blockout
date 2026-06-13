@@ -87,8 +87,7 @@ levelView :: Int -> View Model Action
 levelView n =
     menuScreen
         "STARTING LEVEL"
-        [ H.div_ [P.class_ "note"] ["0 is the easiest level"]
-        , H.div_
+        [ H.div_
             [P.class_ "levels"]
             [ H.div_
                 [ P.class_ (if k == n then "lvl sel" else "lvl")
@@ -690,8 +689,8 @@ sheet =
         , CSS.selector_
             ".levels"
             [ CSS.display "flex"
-            , "flex-direction" =: "row"
-            , "justify-content" =: "center"
+            , "flex-direction" =: "column"
+            , "align-items" =: "center"
             , "gap" =: "8px"
             , "margin-top" =: "16px"
             ]
