@@ -563,6 +563,13 @@ sheet =
             , "flex-direction" =: "column"
             , "gap" =: "10px"
             , "align-items" =: "stretch"
+            , -- Scale the whole UI up by the largest factor that still fits the
+              -- viewport. min() picks the binding dimension, so aspect ratio is
+              -- preserved; the body's flex-center keeps it centred and its
+              -- overflow:hidden suppresses scrollbars. 846x680 is the layout's
+              -- natural size (panels + pit, titlebar + footer).
+              "transform" =: "scale(min(100vw / 846px, 100vh / 680px))"
+            , "transform-origin" =: "center center"
             ]
         , CSS.selector_
             ".titlebar"
